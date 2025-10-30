@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tableau — Postes Santé (Chichaoua)</title>
+  <style>
+    :root{--bg:#f6fbff;--card:#ffffff;--muted:#6b7280;--accent:#0b74ff;--accent-2:#0b5ed7}
+    *{box-sizing:border-box;font-family:Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    body{margin:12px;background:linear-gradient(180deg,var(--bg),#ffffff);color:#0f172a}
+    .container{max-width:1200px;margin:18px auto;padding:18px}
+    header{display:flex;gap:16px;align-items:center;justify-content:space-between}
+    h1{font-size:20px;margin:0}
+    .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    input[type=search]{padding:8px 12px;border-radius:8px;border:1px solid #e6edf5;min-width:220px}
+    select{padding:8px 10px;border-radius:8px;border:1px solid #e6edf5}
+    button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(11,116,255,0.12)}
+    .table-wrap{overflow:auto;margin-top:14px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:9px 10px;text-align:left;border-bottom:1px solid #f0f3f7}
+    th{position:sticky;top:0;background:#fff;cursor:pointer;user-select:none}
+    th .sort{font-size:11px;color:var(--muted);margin-left:8px}
+    tr:hover td{background:linear-gradient(90deg, rgba(11,116,255,0.03), rgba(11,116,255,0.02))}
+    .meta{display:flex;gap:12px;align-items:center;margin-top:12px}
+    .chips{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{background:#f3f7ff;border-radius:8px;padding:6px 8px;font-size:13px;color:var(--muted)}
+    .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .small{font-size:12px;color:var(--muted)}
+    .col-toggle{display:flex;gap:6px;align-items:center}
+    .col-toggle label{font-size:13px}
+    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:12px}
+    @media(max-width:720px){.controls{flex-direction:column;align-items:stretch}.right{margin-left:0}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Postes disponibles — CHICHAOUA</h1>
+      <div class="small">Vue dynamique — trie, filtre, export</div>
+    </header>
+
+    <section class="card" aria-label="Tableau des postes">
+      <div class="controls">
+        <input id="search" type="search" placeholder="Recherche rapide (nom hôpital, spécialité...)" />
+
+        <select id="filterSpecialite">
+          <option value="">Tous les spécialités</option>
+        </select>
+
+        <select id="filterDelegation">
+          <option value="">Toutes les délégations</option>
+        </select>
+
+        <select id="filterEtablissement">
+          <option value="">Tous les établissements</option>
+        </select>
+
+        <div class="right">
+          <button id="exportCsv">Exporter CSV</button>
+          <button id="reset" class="ghost">Réinitialiser</button>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div class="chips">
+          <div class="chip">Lignes affichées: <strong id="rowsShown">0</strong></div>
+          <div class="chip">Total postes: <strong id="totalPostes">0</strong></div>
+        </div>
+
+        <div class="col-toggle" style="margin-left:auto">
+          <label><input type="checkbox" data-col="0" checked /> Grade</label>
+          <label><input type="checkbox" data-col="1" checked /> Spécialité</label>
+          <label><input type="checkbox" data-col="2" checked /> Délégation</label>
+          <label><input type="checkbox" data-col="3" checked /> Formation Sanitaire</label>
+          <label><input type="checkbox" data-col="4" checked /> Nombre de Poste</label>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="mainTable">
+          <thead>
+            <tr>
+              <th data-key="Grade">Grade <span class="sort">↕</span></th>
+              <th data-key="Spécialité">Spécialité <span class="sort">↕</span></th>
+              <th data-key="Délégation">Délégation <span class="sort">↕</span></th>
+              <th data-key="Formation Sanitaire">Formation Sanitaire <span class="sort">↕</span></th>
+              <th data-key="Nombre de Poste">Nombre de Poste <span class="sort">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+        <div class="small">Cliquez sur les en-têtes pour trier — utilisez les filtres pour affiner</div>
+        <div>
+          <button id="prev" class="ghost">Préc.</button>
+          <span class="small">Page <span id="page">1</span></span>
+          <button id="next" class="ghost">Suiv.</button>
+        </div>
+      </div>
+    </section>
+
+    <footer class="small">Fait avec ❤️ — si tu veux d'autres colonnes ou impressions, dis moi.</footer>
+  </div>
+
+  <script>
+    // Data source: converted from user's table
+    const data = [
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN ANESTHESIE ET REANIMATION", Délégation: "CHICHAOUA", "Formation Sanitaire": "HPR Imintanout", "Nombre de Poste": 3},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN ANESTHESIE ET REANIMATION", Délégation: "CHICHAOUA", "Formation Sanitaire": "HP Mohamed VI", "Nombre de Poste": 4},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN NEONATALOGIE", Délégation: "CHICHAOUA", "Formation Sanitaire": "HP Mohamed VI", "Nombre de Poste": 2},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN SANTE DE FAMILLE ET SANTE COMMUN", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSRI Ait Hadi", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN SANTE DE FAMILLE ET SANTE COMMUN", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSRI ZAOUIA NHILIA", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN SANTE DE FAMILLE ET SANTE COMMUN", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Sid Lmoukhtar", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN URGENCES ET SOINS INTENSIFS", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Majjat - UMP", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN URGENCES ET SOINS INTENSIFS", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Sid Lmoukhtar", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN URGENCES ET SOINS INTENSIFS", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSU2 Imintanoute - UMP", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN URGENCES ET SOINS INTENSIFS", Délégation: "CHICHAOUA", "Formation Sanitaire": "HP Mohamed VI", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER EN URGENCES ET SOINS INTENSIFS", Délégation: "CHICHAOUA", "Formation Sanitaire": "HPR Imintanout", "Nombre de Poste": 2},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSRI Adassil", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSRI Ait Hadi", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSRI Kouzemt", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Afella Issen", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Ait Hadou Youssef", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Assif El Mal", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Ichamraren", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Lamzoudia", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Majjat- UMP", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 S Abdelmoumen", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Taouloukoult - UMP", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "DR Addouz", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "DR Laadilate", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "DR Lakhnig", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "DR R'bat", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "DR TAZZIDRA", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "HEMO Centre d'hémodialyse", "Nombre de Poste": 1},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSRI Imi N'dounite", "Nombre de Poste": 2},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Sid Lmoukhtar", "Nombre de Poste": 2},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Bouabout", "Nombre de Poste": 3},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "CTR CENTRE D'HÉMODIALYSE IMINTANOUT", "Nombre de Poste": 3},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "HP Mohamed VI", "Nombre de Poste": 6},
+      {Grade: "INFIRMIER DE 1er GRADE", "Spécialité": "INFIRMIER POLYVALENT", Délégation: "CHICHAOUA", "Formation Sanitaire": "HPR Imintanout", "Nombre de Poste": 14},
+      {Grade: "SAGE FEMME DE 1er GRADE", "Spécialité": "SAGE FEMME", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Assif EI Mal", "Nombre de Poste": 2},
+      {Grade: "SAGE FEMME DE 1er GRADE", "Spécialité": "SAGE FEMME", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Bouabout", "Nombre de Poste": 1},
+      {Grade: "SAGE FEMME DE 1er GRADE", "Spécialité": "SAGE FEMME", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Ichamraren", "Nombre de Poste": 1},
+      {Grade: "SAGE FEMME DE 1er GRADE", "Spécialité": "SAGE FEMME", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Timezgadiouine", "Nombre de Poste": 1},
+      {Grade: "REEDUCATEUR DE 1er GRADE", "Spécialité": "KINESITHERAPEUTE", Délégation: "CHICHAOUA", "Formation Sanitaire": "HPR Imintanout", "Nombre de Poste": 1},
+      {Grade: "REEDUCATEUR DE 1er GRADE", "Spécialité": "DIETETICIEN", Délégation: "CHICHAOUA", "Formation Sanitaire": "HPR Imintanout", "Nombre de Poste": 1},
+      {Grade: "TECHNICIEN DE SANTE DE 1er Grade", "Spécialité": "TECHNICIEN D'HYGIENE DU MILIEU", Délégation: "CHICHAOUA", "Formation Sanitaire": "CSR2 Sid Lmoukhtar", "Nombre de Poste": 1},
+      {Grade: "TECHNICIEN DE SANTE DE 1er Grade", "Spécialité": "TECHNICIEN D'HYGIENE DU MILIEU", Délégation: "CHICHAOUA", "Formation Sanitaire": "HPR Imintanout", "Nombre de Poste": 1},
+      {Grade: "TECHNICIEN DE SANTE DE 1er Grade", "Spécialité": "TECHNICIEN DE LABORATOIRE", Délégation: "CHICHAOUA", "Formation Sanitaire": "HPR Imintanout", "Nombre de Poste": 3},
+      {Grade: "TECHNICIEN DE SANTE DE 1er Grade", "Spécialité": "TECHNICIEN DE STATISTIQUES SANITAIRES", Délégation: "CHICHAOUA", "Formation Sanitaire": "HPR Imintanout", "Nombre de Poste": 1},
+      {Grade: "TECHNICIEN DE SANTE DE 1er Grade", "Spécialité": "TECHNICIEN EN MAINTENANCE BIOMEDICALE", Délégation: "CHICHAOUA", "Formation Sanitaire": "HPR Imintanout", "Nombre de Poste": 1}
+    ];
+
+    // State
+    let state = {query:'',specialite:'',delegation:'',etab:'',sortKey:'',sortDir:1,page:1,perPage:12,visibleCols:[0,1,2,3,4]};
+
+    // Helpers
+    const tbody = document.getElementById('tbody');
+    const rowsShownEl = document.getElementById('rowsShown');
+    const totalPostesEl = document.getElementById('totalPostes');
+    const pageEl = document.getElementById('page');
+
+    function uniqueValues(field){return Array.from(new Set(data.map(d=>d[field]))).sort();}
+
+    // Populate filters
+    function populateFilters(){
+      const sSel = document.getElementById('filterSpecialite');
+      const dSel = document.getElementById('filterDelegation');
+      const eSel = document.getElementById('filterEtablissement');
+      uniqueValues('Spécialité').forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sSel.appendChild(o)});
+      uniqueValues('Délégation').forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;dSel.appendChild(o)});
+      uniqueValues('Formation Sanitaire').forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;eSel.appendChild(o)});
+    }
+
+    function applyFilters(){
+      let filtered=data.filter(row=>{
+        const q=state.query.trim().toLowerCase();
+        if(q){const hay = Object.values(row).join(' ').toLowerCase(); if(!hay.includes(q)) return false}
+        if(state.specialite && row['Spécialité']!==state.specialite) return false;
+        if(state.delegation && row['Délégation']!==state.delegation) return false;
+        if(state.etab && row['Formation Sanitaire']!==state.etab) return false;
+        return true;
+      });
+      return filtered;
+    }
+
+    function sortData(arr){
+      if(!state.sortKey) return arr;
+      return arr.slice().sort((a,b)=>{
+        const A=a[state.sortKey]; const B=b[state.sortKey];
+        if(typeof A==='number') return (A-B)*state.sortDir;
+        return A.localeCompare(B)*state.sortDir;
+      });
+    }
+
+    function render(){
+      const filtered = applyFilters();
+      const sorted = sortData(filtered);
+      const totalPostes = data.reduce((s,r)=>s + Number(r['Nombre de Poste']),0);
+      totalPostesEl.textContent = totalPostes;
+
+      const start = (state.page-1)*state.perPage; const end = start + state.perPage;
+      const pageItems = sorted.slice(start,end);
+
+      tbody.innerHTML = '';
+      pageItems.forEach(row=>{
+        const tr = document.createElement('tr');
+        ['Grade','Spécialité','Délégation','Formation Sanitaire','Nombre de Poste'].forEach((key,ci)=>{
+          const td = document.createElement('td');
+          td.textContent = row[key];
+          td.dataset.col = ci;
+          if(!state.visibleCols.includes(ci)) td.style.display = 'none';
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+
+      rowsShownEl.textContent = filtered.length;
+      pageEl.textContent = state.page;
+    }
+
+    // Events
+    document.getElementById('search').addEventListener('input',(e)=>{state.query=e.target.value; state.page=1; render();});
+    document.getElementById('filterSpecialite').addEventListener('change',(e)=>{state.specialite=e.target.value; state.page=1; render();});
+    document.getElementById('filterDelegation').addEventListener('change',(e)=>{state.delegation=e.target.value; state.page=1; render();});
+    document.getElementById('filterEtablissement').addEventListener('change',(e)=>{state.etab=e.target.value; state.page=1; render();});
+
+    // Sorting by clicking headers
+    document.querySelectorAll('th').forEach(th=>{
+      th.addEventListener('click',()=>{
+        const key = th.dataset.key;
+        if(state.sortKey===key) state.sortDir = -state.sortDir; else {state.sortKey=key; state.sortDir=1}
+        render();
+      });
+    });
+
+    // Column toggles
+    document.querySelectorAll('.col-toggle input[type=checkbox]').forEach(ch=>{
+      ch.addEventListener('change',(e)=>{
+        const col = Number(e.target.dataset.col);
+        if(e.target.checked){ if(!state.visibleCols.includes(col)) state.visibleCols.push(col);} else { state.visibleCols = state.visibleCols.filter(c=>c!==col);} render();
+      });
+    });
+
+    // Pagination
+    document.getElementById('prev').addEventListener('click',()=>{ if(state.page>1){state.page--; render();}});
+    document.getElementById('next').addEventListener('click',()=>{ const filtered = applyFilters(); const maxPage = Math.max(1, Math.ceil(filtered.length/state.perPage)); if(state.page < maxPage){state.page++; render();}});
+
+    // Reset
+    document.getElementById('reset').addEventListener('click',()=>{
+      state = {query:'',specialite:'',delegation:'',etab:'',sortKey:'',sortDir:1,page:1,perPage:12,visibleCols:[0,1,2,3,4]};
+      document.getElementById('search').value='';
+      document.getElementById('filterSpecialite').value='';
+      document.getElementById('filterDelegation').value='';
+      document.getElementById('filterEtablissement').value='';
+      document.querySelectorAll('.col-toggle input[type=checkbox]').forEach(ch=>ch.checked=true);
+      render();
+    });
+
+    // Export CSV
+    function toCSV(rows){
+      const header = ['Grade','Spécialité','Délégation','Formation Sanitaire','Nombre de Poste'];
+      const lines = [header.join(',')];
+      rows.forEach(r=>{lines.push([r.Grade, r['Spécialité'], r.Délégation, r['Formation Sanitaire'], r['Nombre de Poste']].map(c=> '"'+String(c).replace(/"/g,'""')+'"').join(','))});
+      return lines.join('\n');
+    }
+    document.getElementById('exportCsv').addEventListener('click',()=>{
+      const filtered = sortData(applyFilters());
+      const csv = toCSV(filtered);
+      const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='postes_chichaoua.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // Init
+    populateFilters();
+    // compute initial total and default page
+    document.getElementById('totalPostes').textContent = data.reduce((s,r)=>s + Number(r['Nombre de Poste']),0);
+    render();
+  </script>
+</body>
+</html>
